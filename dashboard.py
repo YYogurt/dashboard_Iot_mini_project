@@ -41,7 +41,7 @@ st.code(f"Port: {MQTT_PORT}")
 
 # Initialize session state variables
 if 'mqtt_client' not in st.session_state:
-    st.session_state.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    st.session_state.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
     st.session_state.mqtt_client.on_connect = on_connect
     st.session_state.mqtt_client.on_message = on_message
     st.session_state.mqtt_connected = False
