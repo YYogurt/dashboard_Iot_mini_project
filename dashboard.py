@@ -1,12 +1,15 @@
 import streamlit as st
 import json
 import time
-import requests
 import paho.mqtt.client as mqtt
+import pymongo
 
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
 MQTT_TOPIC_COMMANDS = "onigiri/smartgarden/commands"
+MONGO_CONNECTION_STRING = "mongodb+srv://onigiri:onigiri@labapi.inqpshm.mongodb.net/?retryWrites=true&w=majority&appName=LabAPI"
+DEVICE_ID = "onigiri_garden_01"
+
 try:
     mqtt_client = mqtt.Client()
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -14,18 +17,19 @@ except Exception as e:
     st.error(f"Could not connect to MQTT Broker: {e}")
     mqtt_client = None
 
-def get_camera_stream_url():
-    try:
-        response = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=5)
-        for tunnel in response.json()["tunnels"]:
-            if tunnel["config"]["addr"] == "http://localhost:8080":
-                return tunnel["public_url"] + "/video_feed"
-    except Exception: return None
+try:
+    mongo_client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
+    db = mongo_client['smartgarden_db']
+    status_collection = db['device_status']
+except Exception as e:
+    st.error(f"Could not connect to MongoDB: {e}")
+    status_collection = None
 
 def load_data():
-    try:
-        with open("status.json", "r") as f: return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError): return {}
+    if status_collection:
+        data = status_collection.find_one({"device_id": DEVICE_ID})
+        return data if data else {}
+    return {}
 
 def format_metric(value, unit=""):
     return f"{value:.1f}{unit}" if isinstance(value, (int, float)) else "N/A"
@@ -34,7 +38,7 @@ st.set_page_config(layout="wide")
 st.title("🌿 IoT Smart Garden Dashboard")
 
 data = load_data()
-video_stream_url = get_camera_stream_url()
+video_stream_url = data.get("video_stream_url") 
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("💧 Soil Moisture", format_metric(data.get("soil_moisture")))
@@ -62,7 +66,7 @@ cam_c, raw_c = st.columns(2)
 if video_stream_url:
     cam_c.image(video_stream_url, caption="Live Camera Feed", width='stretch')
 else:
-    cam_c.warning("Could not get ngrok camera URL. Is ngrok running?")
+    cam_c.warning("Camera stream URL not found. Is the Raspberry Pi running?")
 raw_c.subheader("Raw Data")
 raw_c.json(data)
 

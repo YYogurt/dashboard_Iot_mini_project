@@ -1,2 +1,5 @@
+streamlit
+pymongo
+dnspython
 paho-mqtt
 requests
