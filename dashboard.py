@@ -4,12 +4,14 @@ import time
 import paho.mqtt.client as mqtt
 import pymongo
 
+# --- 1. SETTINGS ---
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
 MQTT_TOPIC_COMMANDS = "onigiri/smartgarden/commands"
 MONGO_CONNECTION_STRING = "mongodb+srv://onigiri:onigiri@labapi.inqpshm.mongodb.net/?retryWrites=true&w=majority&appName=LabAPI"
 DEVICE_ID = "onigiri_garden_01"
 
+# --- 2. CLIENT SETUP ---
 try:
     mqtt_client = mqtt.Client()
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -25,8 +27,9 @@ except Exception as e:
     st.error(f"Could not connect to MongoDB: {e}")
     status_collection = None
 
+# --- 3. CORE FUNCTIONS ---
 def load_data():
-    if status_collection:
+    if status_collection is not None: # << บรรทัดที่แก้ไข
         data = status_collection.find_one({"device_id": DEVICE_ID})
         return data if data else {}
     return {}
@@ -34,6 +37,7 @@ def load_data():
 def format_metric(value, unit=""):
     return f"{value:.1f}{unit}" if isinstance(value, (int, float)) else "N/A"
 
+# --- 4. UI DISPLAY ---
 st.set_page_config(layout="wide")
 st.title("🌿 IoT Smart Garden Dashboard")
 
@@ -66,7 +70,7 @@ cam_c, raw_c = st.columns(2)
 if video_stream_url:
     cam_c.image(video_stream_url, caption="Live Camera Feed", width='stretch')
 else:
-    cam_c.warning("Camera stream URL not found. Is the Raspberry Pi running?")
+    cam_c.warning("Camera stream URL not found in database. Is the Raspberry Pi running?")
 raw_c.subheader("Raw Data")
 raw_c.json(data)
 
