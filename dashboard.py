@@ -1,16 +1,30 @@
-# dashboard.py (เวอร์ชันแสดงผลพยากรณ์อากาศแบบสรุป)
+# dashboard.py (เวอร์ชันแก้ไขปัญหากล้อง ngrok)
 import streamlit as st
 import time
 from pymongo import MongoClient
 import os
 
-# (ส่วน Configuration และ MongoDB Connection เหมือนเดิม)
+# --- Configuration ---
 MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
 MONGO_DB_NAME = "smartgarden"
 MONGO_COLLECTION_NAME = "status"
-PI_IP_ADDRESS = os.environ.get("PI_IP_ADDRESS")
-VIDEO_STREAM_URL = f"http://{PI_IP_ADDRESS}:8080/video_feed" if PI_IP_ADDRESS else None
 
+# --- ✨ การเปลี่ยนแปลงสำคัญ ✨ ---
+# ใช้ Secret ใหม่ชื่อ STREAM_HOST
+STREAM_HOST = os.environ.get("STREAM_HOST")
+VIDEO_STREAM_URL = None
+
+if STREAM_HOST:
+    # ตรวจสอบว่า Host ที่ได้เป็นของ ngrok หรือไม่
+    if "ngrok-free.app" in STREAM_HOST:
+        # ถ้าใช่ ให้สร้าง URL แบบ https และไม่ต้องใส่ Port
+        VIDEO_STREAM_URL = f"https://{STREAM_HOST}/video_feed"
+    else:
+        # ถ้าเป็น IP Address ปกติ ให้สร้าง URL แบบ http และใส่ Port 8080
+        VIDEO_STREAM_URL = f"http://{STREAM_HOST}:8080/video_feed"
+# ------------------------------------
+
+# (ส่วน MongoDB Connection เหมือนเดิม)
 @st.cache_resource
 def get_mongo_collection():
     if not MONGO_CONNECTION_STRING: return None
@@ -39,18 +53,15 @@ else:
 
     left_col, right_col = st.columns(2)
     with left_col:
+        # (ส่วน UI ด้านซ้ายเหมือนเดิมทั้งหมด)
         st.subheader("System Status")
         status_indicator = "🟢 Connected to DB" if data else "🟠 Connected, No Data Yet"
         st.metric(label="Database Connection", value=status_indicator)
         st.write("---")
-        
-        # --- ✨ แก้ไขส่วนแสดงผลพยากรณ์อากาศ ✨ ---
         city = data.get('city', 'N/A')
         st.write(f"**Daily Forecast for {city}**")
         forecast_desc = data.get('forecast_description', 'No forecast available.')
         st.info(f"🌦️ {forecast_desc}")
-        # ------------------------------------
-        
         st.write("---")
         st.write("**Live Sensor Data**")
         s1, s2, s3 = st.columns(3)
@@ -60,8 +71,6 @@ else:
         s2.metric("🌱 Soil", f"{data.get('soil_moisture', 0)} (raw)")
         s3.metric("🌊 Water", f"{data.get('water_level', 0)} (raw)")
         st.write("---")
-
-        # (ส่วนควบคุมที่เหลือเหมือนเดิม)
         system_mode = data.get('mode', 'N/A').upper()
         st.header(f"Mode: {system_mode}")
         pump_status_text = "ON 🟢" if data.get("pump_on") else "OFF 🔴"
@@ -74,8 +83,10 @@ else:
 
     with right_col:
         st.subheader("Live Feed")
-        if VIDEO_STREAM_URL: st.image(VIDEO_STREAM_URL)
-        else: st.warning("PI_IP_ADDRESS secret not set.")
+        if VIDEO_STREAM_URL:
+            st.image(VIDEO_STREAM_URL, caption="Live Feed")
+        else:
+            st.warning("STREAM_HOST secret not set.")
 
     time.sleep(3)
     st.rerun()
