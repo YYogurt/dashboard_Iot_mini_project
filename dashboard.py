@@ -1,22 +1,19 @@
-# dashboard.py (MongoDB Version - Final Fix)
+# dashboard.py (MongoDB Version - เพิ่ม Weather Forecast)
 import streamlit as st
 import time
 from pymongo import MongoClient
 import os
 
 # --- Configuration ---
-# This value must be set in your Streamlit Secrets
 MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
 MONGO_DB_NAME = "smartgarden"
 MONGO_COLLECTION_NAME = "status"
-# This value also comes from your Secrets for the video stream
 PI_IP_ADDRESS = os.environ.get("PI_IP_ADDRESS")
 VIDEO_STREAM_URL = f"http://{PI_IP_ADDRESS}:8080/video_feed" if PI_IP_ADDRESS else None
 
 # --- MongoDB Connection ---
 @st.cache_resource
 def get_mongo_collection():
-    """Establishes a connection to the MongoDB collection."""
     if not MONGO_CONNECTION_STRING:
         st.error("MONGO_CONNECTION_STRING secret is not set!")
         return None
@@ -24,7 +21,6 @@ def get_mongo_collection():
         mongo_client = MongoClient(MONGO_CONNECTION_STRING)
         db = mongo_client[MONGO_DB_NAME]
         collection = db[MONGO_COLLECTION_NAME]
-        # Verify connection
         mongo_client.admin.command('ping')
         print("MongoDB connection successful.")
         return collection
@@ -35,7 +31,6 @@ def get_mongo_collection():
 collection = get_mongo_collection()
 
 def send_command_to_db(command_str: str):
-    """Writes a command to the 'command' field in the database."""
     if collection is not None:
         collection.update_one({"_id": "main_status"}, {"$set": {"command": command_str}})
         st.toast(f"Sent '{command_str}' command!")
@@ -44,32 +39,37 @@ def send_command_to_db(command_str: str):
 st.set_page_config(page_title="IoT Smart Garden", layout="wide")
 st.title("🌿 IoT Smart Garden (MongoDB)")
 
-# --- ✨ THIS IS THE FIX ✨ ---
-# We check if the connection object is None, instead of using 'if not'
 if collection is None:
     st.error("Database connection is not available. Please check the secrets and app logs.")
 else:
-    # Fetch the latest data from the database
     data = collection.find_one({"_id": "main_status"})
     if data is None:
-        data = {} # Use an empty dict if no data exists yet
+        data = {}
 
     left_col, right_col = st.columns(2)
 
     with left_col:
-        st.subheader("Sensor Readings & Status")
-        # The connection is successful if we have a collection and some data
+        st.subheader("System Status")
         status_indicator = "🟢 Connected to DB" if data else "🟠 Connected, No Data Yet"
         st.metric(label="Database Connection", value=status_indicator)
         st.write("---")
-
+        
+        # --- ✨ เพิ่มส่วนแสดงผลพยากรณ์อากาศ ✨ ---
+        city = data.get('city', 'N/A')
+        st.write(f"**Weather Forecast for {city}**")
+        f1, f2 = st.columns(2)
+        f1.metric("🌡️ Forecast Temp", f"{data.get('forecast_temp', 0):.2f} °C")
+        f2.metric("💧 Forecast Humidity", f"{data.get('forecast_humidity', 0)} %")
+        # ------------------------------------
+        
+        st.write("---")
+        st.write("**Live Sensor Data**")
         s1, s2, s3 = st.columns(3)
         s1.metric("🌡️ Air Temperature", f"{data.get('air_temp', 0):.2f} °C")
         s1.metric("💧 Air Humidity", f"{data.get('air_humidity', 0):.2f} %")
         s2.metric("☀️ Light Intensity", f"{data.get('light_lux', 0):.2f} Lux")
         s2.metric("🌱 Soil Moisture", f"{data.get('soil_moisture', 0)} (raw)")
         s3.metric("🌊 Water Level", f"{data.get('water_level', 0)} (raw)")
-        
         st.write("---")
 
         system_mode = data.get('mode', 'N/A').upper()
