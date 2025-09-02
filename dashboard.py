@@ -1,10 +1,8 @@
-# dashboard.py (เพิ่มปุ่ม Toggle Mode)
 import streamlit as st
 import time
 from pymongo import MongoClient
 import os
 
-# (ส่วน Configuration และ MongoDB Connection เหมือนเดิม)
 MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
 MONGO_DB_NAME = "smartgarden"
 MONGO_COLLECTION_NAME = "status"
@@ -30,7 +28,6 @@ def send_command_to_db(command_str: str):
         collection.update_one({"_id": "main_status"}, {"$set": {"command": command_str}})
         st.toast(f"Sent '{command_str}' command!")
 
-# --- Main App ---
 st.set_page_config(page_title="IoT Smart Garden", layout="wide")
 st.title("🌿 IoT Smart Garden Dashboard")
 
@@ -43,7 +40,6 @@ else:
     left_col, right_col = st.columns([2, 1.5])
 
     with left_col:
-        # (ส่วน UI ด้านซ้ายเหมือนเดิม)
         st.subheader("📊 System Status & Sensors")
         status_indicator = "🟢 Connected to DB" if data else "🟠 Connected, No Data Yet"
         st.metric(label="Database Connection", value=status_indicator)
@@ -68,13 +64,12 @@ else:
 
         finger_count = data.get('finger_count', 'N/A')
         st.write(f"### 🖐️ Detected Fingers: {finger_count}")
-        st.info("Show 2 fingers to toggle modes.")
+        st.info("Show 2 fingers to toggle modes. Show 5 to force water.")
         st.write("---")
 
         system_mode = data.get('mode', 'N/A').upper()
         st.header(f"Mode: {system_mode}")
         
-        # --- ✨ เพิ่มปุ่ม Toggle Mode ✨ ---
         if st.button("Toggle Mode"):
             send_command_to_db("TOGGLE_MODE")
 
